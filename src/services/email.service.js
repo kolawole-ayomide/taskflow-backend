@@ -1,33 +1,9 @@
-const nodemailer = require('nodemailer');
-
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const EMAIL_FROM = process.env.EMAIL_FROM || process.env.SMTP_USER;
+const EMAIL_FROM = process.env.EMAIL_FROM;
 
-let transporter = null;
-
-const getTransporter = () => {
-  if (transporter) return transporter;
-
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    return null;
-  }
-
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: Number(process.env.SMTP_PORT) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 5000,
-  });
-
-  return transporter;
-};
-
+// Uses Brevo's HTTP API instead of SMTP — most free hosting platforms (Render's
+// free tier included) block outbound SMTP ports, but regular HTTPS traffic like
+// this is unaffected.
 const sendEmail = async ({ to, subject, html }) => {
   // Never make a real network call during tests — keeps the suite fast and deterministic,
   // no matter what ends up in .env.test.
@@ -35,15 +11,34 @@ const sendEmail = async ({ to, subject, html }) => {
     return { skipped: true, reason: 'test environment' };
   }
 
-  const activeTransporter = getTransporter();
-
-  if (!activeTransporter) {
-    console.warn(`[email] SMTP not configured — skipping email to ${to} ("${subject}")`);
+  if (!process.env.BREVO_API_KEY || !EMAIL_FROM) {
+    console.warn(`[email] Brevo not configured — skipping email to ${to} ("${subject}")`);
     return { skipped: true };
   }
 
   try {
-    return await activeTransporter.sendMail({ from: EMAIL_FROM, to, subject, html });
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { email: EMAIL_FROM },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`[email] Brevo failed to send to ${to}: ${response.status} ${errorBody}`);
+      return { skipped: true, error: errorBody };
+    }
+
+    return await response.json();
   } catch (error) {
     // A failed email should never break the request that triggered it (signup, invite, etc.)
     console.error(`[email] Failed to send to ${to}:`, error.message);
