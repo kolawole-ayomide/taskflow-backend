@@ -39,6 +39,22 @@ const updateWorkspace = async ({ workspaceId, name }) => {
   return workspace;
 };
 
+const getWorkspaceMembers = async (workspaceId) => {
+  const memberships = await prisma.workspaceMember.findMany({
+    where: { workspaceId },
+    include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+    orderBy: { user: { name: 'asc' } },
+  });
+
+  return memberships.map((m) => ({
+    id: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+    avatarUrl: m.user.avatarUrl,
+    role: m.role,
+  }));
+};
+
 const inviteMember = async ({ workspaceId, email, invitedById }) => {
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   const user = await prisma.user.findUnique({ where: { email } });
@@ -84,4 +100,11 @@ const deleteWorkspace = async (workspaceId) => {
   await prisma.workspace.delete({ where: { id: workspaceId } });
 };
 
-module.exports = { createWorkspace, getUserWorkspaces, updateWorkspace, inviteMember, deleteWorkspace };
+module.exports = {
+  createWorkspace,
+  getUserWorkspaces,
+  updateWorkspace,
+  getWorkspaceMembers,
+  inviteMember,
+  deleteWorkspace,
+};

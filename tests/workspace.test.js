@@ -210,6 +210,68 @@ describe('Workspace CRUD', () => {
     expect(res.status).toBe(403);
   });
 
+  it('lists workspace members with their roles', async () => {
+    const ownerToken = await signup('owner@test.com', 'Owner');
+    await signup('member@test.com', 'Member');
+
+    const createRes = await request(app)
+      .post('/api/workspaces')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ name: 'Owner Workspace' });
+
+    await request(app)
+      .post(`/api/workspaces/${createRes.body.id}/invite`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ email: 'member@test.com' });
+
+    const res = await request(app)
+      .get(`/api/workspaces/${createRes.body.id}/members`)
+      .set('Authorization', `Bearer ${ownerToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    const roles = res.body.map((m) => m.role).sort();
+    expect(roles).toEqual(['MEMBER', 'OWNER']);
+  });
+
+  it('allows a MEMBER to view the workspace member list', async () => {
+    const ownerToken = await signup('owner@test.com', 'Owner');
+    const memberToken = await signup('member@test.com', 'Member');
+
+    const createRes = await request(app)
+      .post('/api/workspaces')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ name: 'Owner Workspace' });
+
+    await request(app)
+      .post(`/api/workspaces/${createRes.body.id}/invite`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ email: 'member@test.com' });
+
+    const res = await request(app)
+      .get(`/api/workspaces/${createRes.body.id}/members`)
+      .set('Authorization', `Bearer ${memberToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+  });
+
+  it('rejects a non-member from viewing the workspace member list', async () => {
+    const ownerToken = await signup('owner@test.com', 'Owner');
+    const outsiderToken = await signup('outsider@test.com', 'Outsider');
+
+    const createRes = await request(app)
+      .post('/api/workspaces')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ name: 'Owner Workspace' });
+
+    const res = await request(app)
+      .get(`/api/workspaces/${createRes.body.id}/members`)
+      .set('Authorization', `Bearer ${outsiderToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
   it('deletes a workspace as owner', async () => {
     const token = await signup();
 

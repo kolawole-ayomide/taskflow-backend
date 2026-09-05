@@ -8,6 +8,7 @@ router.use(authenticate);
 router.get('/', workspaceController.getMine);
 router.post('/', workspaceController.create);
 router.patch('/:id', checkWorkspaceRole(['OWNER', 'ADMIN']), workspaceController.update);
+router.get('/:id/members', checkWorkspaceRole(['OWNER', 'ADMIN', 'MEMBER']), workspaceController.getMembers);
 router.post('/:id/invite', checkWorkspaceRole(['OWNER', 'ADMIN']), workspaceController.invite);
 router.delete('/:id', checkWorkspaceRole(['OWNER']), workspaceController.remove);
 

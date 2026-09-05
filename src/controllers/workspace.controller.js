@@ -37,6 +37,15 @@ const update = async (req, res, next) => {
   }
 };
 
+const getMembers = async (req, res, next) => {
+  try {
+    const members = await workspaceService.getWorkspaceMembers(req.params.id);
+    return res.status(200).json(members);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const invite = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -68,4 +77,4 @@ const remove = async (req, res, next) => {
   }
 };
 
-module.exports = { create, getMine, update, invite, remove };
+module.exports = { create, getMine, update, getMembers, invite, remove };
