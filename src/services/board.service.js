@@ -17,7 +17,7 @@ const getBoardById = async (boardId) => {
           cards: {
             orderBy: { position: 'asc' },
             include: {
-              assignees: { select: { id: true, name: true, avatarUrl: true } },
+              assignees: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
             },
           },
         },
@@ -30,6 +30,14 @@ const getBoardById = async (boardId) => {
     notFoundError.statusCode = 404;
     throw notFoundError;
   }
+
+  // Flatten each card's join-table assignee rows back into a plain user list,
+  // so the response shape matches what it was before this became an explicit join table.
+  board.lists.forEach((list) => {
+    list.cards.forEach((card) => {
+      card.assignees = card.assignees.map((assignee) => assignee.user);
+    });
+  });
 
   return board;
 };

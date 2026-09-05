@@ -19,14 +19,21 @@ const updateCard = async ({ cardId, listId, position, title, description, dueDat
       ...(dueDate !== undefined && { dueDate }),
       ...(labels !== undefined && { labels }),
       ...(assigneeIds !== undefined && {
-        assignees: { set: assigneeIds.map((id) => ({ id })) },
+        assignees: {
+          deleteMany: {},
+          create: assigneeIds.map((id) => ({ user: { connect: { id } } })),
+        },
       }),
     },
     include: {
-      assignees: { select: { id: true, name: true, avatarUrl: true } },
+      assignees: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
       list: { select: { boardId: true } },
     },
   });
+
+  // Flatten the join-table rows back into a plain list of users, so the API
+  // response shape is unchanged from before this was an explicit join table.
+  card.assignees = card.assignees.map((assignee) => assignee.user);
   return card;
 };
 

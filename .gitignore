@@ -7,8 +7,7 @@
 # Dependencies
 node_modules/
 
-# Prisma
-prisma/migrations/dev.db
+
 
 # Test coverage reports
 coverage/

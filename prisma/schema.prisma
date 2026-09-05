@@ -27,7 +27,7 @@ model User {
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
   memberships           WorkspaceMember[]
-  assignedCards         Card[]            @relation("CardAssignees")
+  cardAssignments       CardAssignee[]
   comments              Comment[]
   activities            ActivityLog[]
 }
@@ -84,7 +84,7 @@ model Card {
   labels      Json?
   listId      String
   list        List          @relation(fields: [listId], references: [id], onDelete: Cascade)
-  assignees   User[]        @relation("CardAssignees")
+  assignees   CardAssignee[]
   comments    Comment[]
   activities  ActivityLog[]
   createdAt   DateTime      @default(now())
@@ -114,6 +114,16 @@ model WorkspaceInvite {
   createdAt   DateTime  @default(now())
 
   @@unique([workspaceId, email])
+}
+
+model CardAssignee {
+  id     String @id @default(uuid())
+  cardId String
+  userId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, userId])
 }
 
 model ActivityLog {
