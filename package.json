@@ -1,0 +1,39 @@
+{
+  "name": "taskflow-backend",
+  "version": "1.0.0",
+  "description": "Backend API for TaskFlow",
+  "main": "src/server.js",
+    "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "db:push": "prisma db push",
+    "db:push:test": "cross-env DATABASE_URL=mysql://root:@localhost:3306/taskflow_test_db prisma db push",
+    "test": "cross-env NODE_ENV=test jest --runInBand --coverage"
+  },
+  "jest": {
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^9.1.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "jest": "^30.5.1",
+    "nodemon": "^3.1.14",
+    "prisma": "^6.19.3",
+    "socket.io-client": "^4.8.3",
+    "supertest": "^7.2.2"
+  }
+}

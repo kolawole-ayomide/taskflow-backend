@@ -1,0 +1,33 @@
+# Environment variables — never commit real secrets
+.env
+.env.local
+.env.test
+.env.production
+
+# Dependencies
+node_modules/
+
+# Prisma
+prisma/migrations/dev.db
+
+# Test coverage reports
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Zip files
+*.zip
+
+# Editor folders
+.vscode/
+.idea/
+
+# Build output (if you ever add one)
+dist/
+build/

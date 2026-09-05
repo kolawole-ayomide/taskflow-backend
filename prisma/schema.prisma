@@ -1,0 +1,129 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id                    String            @id @default(uuid())
+  email                 String            @unique
+  passwordHash          String
+  name                  String
+  avatarUrl             String?
+  emailVerified         Boolean           @default(false)
+  verificationToken     String?           @unique
+  verificationExpiresAt DateTime?
+  resetToken            String?           @unique
+  resetTokenExpiresAt   DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  memberships           WorkspaceMember[]
+  assignedCards         Card[]            @relation("CardAssignees")
+  comments              Comment[]
+  activities            ActivityLog[]
+}
+
+model Workspace {
+  id        String            @id @default(uuid())
+  name      String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  members   WorkspaceMember[]
+  boards    Board[]
+  invites   WorkspaceInvite[]
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  role        Role      @default(MEMBER)
+  userId      String
+  workspaceId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+model Board {
+  id          String        @id @default(uuid())
+  title       String
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lists       List[]
+  activities  ActivityLog[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model List {
+  id        String   @id @default(uuid())
+  title     String
+  position  Float
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards     Card[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Card {
+  id          String        @id @default(uuid())
+  title       String
+  description String?       @db.Text
+  position    Float
+  dueDate     DateTime?
+  labels      Json?
+  listId      String
+  list        List          @relation(fields: [listId], references: [id], onDelete: Cascade)
+  assignees   User[]        @relation("CardAssignees")
+  comments    Comment[]
+  activities  ActivityLog[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(uuid())
+  email       String
+  role        Role      @default(MEMBER)
+  token       String    @unique
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedById String
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, email])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  action    String
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cardId    String?
+  card      Card?    @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
