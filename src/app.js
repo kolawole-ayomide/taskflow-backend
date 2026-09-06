@@ -10,6 +10,11 @@ const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
 
+// Render (and most hosting platforms) sit behind a reverse proxy — this tells
+// Express to trust the X-Forwarded-For header for the real client IP, which
+// express-rate-limit specifically requires to work correctly in production.
+app.set('trust proxy', 1);
+
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173')
   .split(',')
   .map((origin) => origin.trim());
