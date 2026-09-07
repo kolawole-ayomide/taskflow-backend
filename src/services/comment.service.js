@@ -5,7 +5,7 @@ const createComment = async ({ cardId, authorId, content }) => {
     data: { cardId, authorId, content },
     include: {
       author: { select: { id: true, name: true, avatarUrl: true } },
-      card: { select: { title: true, list: { select: { boardId: true } } } },
+      card: { select: { title: true, list: { select: { boardId: true, board: { select: { title: true } } } } } },
     },
   });
   return comment;

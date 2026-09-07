@@ -1,5 +1,6 @@
 const cardService = require('../services/card.service');
 const activityService = require('../services/activity.service');
+const notificationService = require('../services/notification.service');
 const { getIO } = require('../sockets/socket.manager');
 
 const create = async (req, res, next) => {
@@ -27,7 +28,7 @@ const create = async (req, res, next) => {
 const update = async (req, res, next) => {
   try {
     const { listId, sourceListId, position, title, description, dueDate, assigneeIds, labels } = req.body;
-    const card = await cardService.updateCard({
+    const { card, newlyAddedAssigneeIds } = await cardService.updateCard({
       cardId: req.params.id,
       listId,
       position,
@@ -39,6 +40,7 @@ const update = async (req, res, next) => {
     });
 
     const boardId = card.list.boardId;
+    const boardTitle = card.list.board.title;
     const isMove = listId !== undefined;
 
     const io = getIO();
@@ -56,6 +58,18 @@ const update = async (req, res, next) => {
         ? `${req.user.name} moved card "${card.title}"`
         : `${req.user.name} updated card "${card.title}"`,
     });
+
+    for (const assigneeId of newlyAddedAssigneeIds) {
+      await notificationService.createNotification({
+        recipientId: assigneeId,
+        actorId: req.user.id,
+        verb: 'assigned_card',
+        cardId: card.id,
+        cardTitle: card.title,
+        boardId,
+        boardName: boardTitle,
+      });
+    }
 
     return res.status(200).json(card);
   } catch (error) {

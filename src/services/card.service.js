@@ -9,6 +9,12 @@ const createCard = async ({ listId, title, position }) => {
 };
 
 const updateCard = async ({ cardId, listId, position, title, description, dueDate, assigneeIds, labels }) => {
+  let previousAssigneeIds = [];
+  if (assigneeIds !== undefined) {
+    const existing = await prisma.cardAssignee.findMany({ where: { cardId }, select: { userId: true } });
+    previousAssigneeIds = existing.map((a) => a.userId);
+  }
+
   const card = await prisma.card.update({
     where: { id: cardId },
     data: {
@@ -27,14 +33,20 @@ const updateCard = async ({ cardId, listId, position, title, description, dueDat
     },
     include: {
       assignees: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
-      list: { select: { boardId: true } },
+      list: { select: { boardId: true, board: { select: { title: true } } } },
     },
   });
 
   // Flatten the join-table rows back into a plain list of users, so the API
   // response shape is unchanged from before this was an explicit join table.
   card.assignees = card.assignees.map((assignee) => assignee.user);
-  return card;
+
+  // Only newly-added assignees get notified — re-saving the same assignee list
+  // shouldn't spam a notification every time the card is otherwise edited.
+  const newlyAddedAssigneeIds =
+    assigneeIds !== undefined ? assigneeIds.filter((id) => !previousAssigneeIds.includes(id)) : [];
+
+  return { card, newlyAddedAssigneeIds };
 };
 
 const deleteCard = async (cardId) => {
