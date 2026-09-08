@@ -8,7 +8,37 @@ const createCard = async ({ listId, title, position }) => {
   return card;
 };
 
-const updateCard = async ({ cardId, listId, position, title, description, dueDate, assigneeIds, labels }) => {
+const updateCard = async ({ cardId, workspaceId, listId, position, title, description, dueDate, assigneeIds, labels }) => {
+  // A card can only move within its own workspace, and only workspace members
+  // can be assigned to it — neither was validated before, which meant a client
+  // could silently move a card into a different workspace's board, or assign
+  // it to someone with no access to it at all.
+  if (listId !== undefined) {
+    const targetList = await prisma.list.findUnique({
+      where: { id: listId },
+      select: { board: { select: { workspaceId: true } } },
+    });
+
+    if (!targetList || targetList.board.workspaceId !== workspaceId) {
+      const error = new Error('Target list not found in this workspace');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  if (assigneeIds !== undefined && assigneeIds.length > 0) {
+    const validMembers = await prisma.workspaceMember.findMany({
+      where: { workspaceId, userId: { in: assigneeIds } },
+      select: { userId: true },
+    });
+
+    if (validMembers.length !== assigneeIds.length) {
+      const error = new Error('One or more assignees are not members of this workspace');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
   let previousAssigneeIds = [];
   if (assigneeIds !== undefined) {
     const existing = await prisma.cardAssignee.findMany({ where: { cardId }, select: { userId: true } });

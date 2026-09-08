@@ -27,9 +27,10 @@ const create = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
-    const { listId, sourceListId, position, title, description, dueDate, assigneeIds, labels } = req.body;
+    const { listId, sourceListId, position, title, description, dueDate, assigneeIds, labels, workspaceId } = req.body;
     const { card, newlyAddedAssigneeIds } = await cardService.updateCard({
       cardId: req.params.id,
+      workspaceId,
       listId,
       position,
       title,
@@ -47,7 +48,14 @@ const update = async (req, res, next) => {
     if (io) {
       io.to(boardId).emit(isMove ? 'card:moved' : 'card:updated', isMove
         ? { cardId: card.id, sourceListId, targetListId: card.listId, newPosition: card.position, updatedBy: req.user.id }
-        : { cardId: card.id, fields: req.body, updatedBy: req.user.id });
+        : {
+            cardId: card.id,
+            // Explicit field list rather than spreading req.body — the RBAC
+            // middleware injects workspaceId into the body, which has no
+            // business appearing in a broadcast payload.
+            fields: { title, description, dueDate, assigneeIds, labels },
+            updatedBy: req.user.id,
+          });
     }
 
     await activityService.logActivity({
@@ -59,16 +67,23 @@ const update = async (req, res, next) => {
         : `${req.user.name} updated card "${card.title}"`,
     });
 
+    // A failed notification should never fail the request — the card update
+    // already succeeded and was already broadcast by this point, so an error
+    // here shouldn't make the client think their edit didn't go through.
     for (const assigneeId of newlyAddedAssigneeIds) {
-      await notificationService.createNotification({
-        recipientId: assigneeId,
-        actorId: req.user.id,
-        verb: 'assigned_card',
-        cardId: card.id,
-        cardTitle: card.title,
-        boardId,
-        boardName: boardTitle,
-      });
+      try {
+        await notificationService.createNotification({
+          recipientId: assigneeId,
+          actorId: req.user.id,
+          verb: 'assigned_card',
+          cardId: card.id,
+          cardTitle: card.title,
+          boardId,
+          boardName: boardTitle,
+        });
+      } catch (notifyError) {
+        console.error('[notifications] Failed to notify assignee:', notifyError.message);
+      }
     }
 
     return res.status(200).json(card);

@@ -1,3 +1,5 @@
+const prisma = require('../config/db');
+
 const boardPresence = new Map();
 
 const getBoardUsers = (boardId) => {
@@ -24,8 +26,32 @@ const leaveBoard = (io, socket, boardId) => {
   socket.emit('presence:sync', remainingUsers);
 };
 
+// Confirms the connected user actually belongs to the workspace this board
+// lives in — sockets have no other authorization layer, so this is the only
+// thing stopping someone from joining any board's live room just by knowing its ID.
+const isAuthorizedForBoard = async (userId, boardId) => {
+  const board = await prisma.board.findUnique({
+    where: { id: boardId },
+    select: { workspaceId: true },
+  });
+
+  if (!board) return false;
+
+  const membership = await prisma.workspaceMember.findUnique({
+    where: { userId_workspaceId: { userId, workspaceId: board.workspaceId } },
+  });
+
+  return Boolean(membership);
+};
+
 const registerBoardEvents = (io, socket) => {
-  socket.on('board:join', ({ boardId }) => {
+  socket.on('board:join', async ({ boardId }) => {
+    const authorized = await isAuthorizedForBoard(socket.user.id, boardId);
+    if (!authorized) {
+      socket.emit('board:join_error', { message: 'You do not have access to this board' });
+      return;
+    }
+
     socket.join(boardId);
 
     if (!boardPresence.has(boardId)) {

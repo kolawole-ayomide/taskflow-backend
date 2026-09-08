@@ -136,6 +136,30 @@ describe('Notifications', () => {
     expect(res.body).toHaveLength(0);
   });
 
+    it('silently ignores a mentioned user who is not a workspace member, without erroring', async () => {
+    const { owner, cardId } = await setupBoardWithTwoMembers();
+
+    const outsiderSignup = await request(app).post('/api/auth/signup').send({
+      name: 'Outsider',
+      email: 'outsider-mention@test.com',
+      password: 'password123',
+    });
+
+    const res = await request(app)
+      .post(`/api/cards/${cardId}/comments`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ content: 'Hey @Outsider', mentionedUserIds: [outsiderSignup.body.user.id] });
+
+    // The comment itself still succeeds — an invalid mention shouldn't fail the whole request.
+    expect(res.status).toBe(201);
+
+    const outsiderNotifs = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', `Bearer ${outsiderSignup.body.token}`);
+
+    expect(outsiderNotifs.body).toHaveLength(0);
+  });
+
   it('marks a single notification as read', async () => {
     const { owner, member, cardId } = await setupBoardWithTwoMembers();
 

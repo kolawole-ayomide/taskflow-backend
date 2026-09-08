@@ -102,6 +102,64 @@ describe('Card CRUD', () => {
     expect(res.status).toBe(204);
   });
 
+    it('rejects moving a card into a list from a different workspace', async () => {
+    const { token, listId } = await setupWorkspaceBoardList();
+
+    const cardRes = await request(app)
+      .post(`/api/lists/${listId}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Fix login bug', position: 1 });
+
+    // A completely separate workspace/board/list owned by a different user —
+    // the first user has no membership here at all.
+    const otherSignup = await request(app).post('/api/auth/signup').send({
+      name: 'Someone Else',
+      email: 'someone-else@test.com',
+      password: 'password123',
+    });
+    const otherWorkspaceRes = await request(app)
+      .post('/api/workspaces')
+      .set('Authorization', `Bearer ${otherSignup.body.token}`)
+      .send({ name: 'Other Workspace' });
+    const otherBoardRes = await request(app)
+      .post('/api/boards')
+      .set('Authorization', `Bearer ${otherSignup.body.token}`)
+      .send({ title: 'Other Board', workspaceId: otherWorkspaceRes.body.id });
+    const otherListRes = await request(app)
+      .post(`/api/boards/${otherBoardRes.body.id}/lists`)
+      .set('Authorization', `Bearer ${otherSignup.body.token}`)
+      .send({ title: 'Other List', position: 1 });
+
+    const res = await request(app)
+      .patch(`/api/cards/${cardRes.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ listId: otherListRes.body.id, sourceListId: listId, position: 1 });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects assigning a card to someone outside the workspace', async () => {
+    const { token, listId } = await setupWorkspaceBoardList();
+
+    const cardRes = await request(app)
+      .post(`/api/lists/${listId}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Fix login bug', position: 1 });
+
+    const outsiderSignup = await request(app).post('/api/auth/signup').send({
+      name: 'Outsider',
+      email: 'outsider@test.com',
+      password: 'password123',
+    });
+
+    const res = await request(app)
+      .patch(`/api/cards/${cardRes.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ assigneeIds: [outsiderSignup.body.user.id] });
+
+    expect(res.status).toBe(400);
+  });
+
   it('rejects card creation without auth', async () => {
     const { listId } = await setupWorkspaceBoardList();
 

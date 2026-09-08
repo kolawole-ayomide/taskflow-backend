@@ -1,11 +1,12 @@
 const commentService = require('../services/comment.service');
 const activityService = require('../services/activity.service');
 const notificationService = require('../services/notification.service');
+const workspaceService = require('../services/workspace.service');
 const { getIO } = require('../sockets/socket.manager');
 
 const create = async (req, res, next) => {
   try {
-    const { content, mentionedUserIds } = req.body;
+    const { content, mentionedUserIds, workspaceId } = req.body;
     if (!content) {
       return res.status(400).json({ message: 'Comment content is required' });
     }
@@ -33,17 +34,30 @@ const create = async (req, res, next) => {
     // mentionedUserIds comes explicitly from the client's @-mention picker,
     // which already resolves a typed name to a specific user id — this avoids
     // fragile parsing of raw comment text for "@Name" patterns server-side.
+    // Anyone not actually in this workspace is silently dropped rather than
+    // notified or allowed to crash the request.
     const uniqueMentionedIds = [...new Set(mentionedUserIds || [])];
-    for (const mentionedId of uniqueMentionedIds) {
-      await notificationService.createNotification({
-        recipientId: mentionedId,
-        actorId: req.user.id,
-        verb: 'mentioned',
-        cardId: comment.cardId,
-        cardTitle: comment.card.title,
-        boardId,
-        boardName: boardTitle,
-      });
+    const validMentionedIds = await workspaceService.getValidMemberIds({
+      workspaceId,
+      userIds: uniqueMentionedIds,
+    });
+
+    // A failed notification should never fail the request — the comment
+    // already succeeded and was already broadcast by this point.
+    for (const mentionedId of validMentionedIds) {
+      try {
+        await notificationService.createNotification({
+          recipientId: mentionedId,
+          actorId: req.user.id,
+          verb: 'mentioned',
+          cardId: comment.cardId,
+          cardTitle: comment.card.title,
+          boardId,
+          boardName: boardTitle,
+        });
+      } catch (notifyError) {
+        console.error('[notifications] Failed to notify mentioned user:', notifyError.message);
+      }
     }
 
     return res.status(201).json(comment);

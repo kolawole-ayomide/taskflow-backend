@@ -100,11 +100,26 @@ const deleteWorkspace = async (workspaceId) => {
   await prisma.workspace.delete({ where: { id: workspaceId } });
 };
 
+// Filters a list of user IDs down to only those who are actually members of
+// this workspace — used to stop a client from mentioning/notifying a user
+// who has no access to it.
+const getValidMemberIds = async ({ workspaceId, userIds }) => {
+  if (!userIds || userIds.length === 0) return [];
+
+  const members = await prisma.workspaceMember.findMany({
+    where: { workspaceId, userId: { in: userIds } },
+    select: { userId: true },
+  });
+
+  return members.map((m) => m.userId);
+};
+
 module.exports = {
   createWorkspace,
   getUserWorkspaces,
   updateWorkspace,
   getWorkspaceMembers,
+  getValidMemberIds,
   inviteMember,
   deleteWorkspace,
 };
