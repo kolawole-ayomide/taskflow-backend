@@ -7,6 +7,7 @@ const listRoutes = require('./routes/list.routes');
 const cardRoutes = require('./routes/card.routes');
 const commentRoutes = require('./routes/comment.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const userRoutes = require('./routes/user.routes');
 const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
@@ -30,6 +31,7 @@ app.use('/api/lists', listRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/user', userRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK' });

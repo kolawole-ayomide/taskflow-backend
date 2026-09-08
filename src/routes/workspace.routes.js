@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const workspaceController = require('../controllers/workspace.controller');
+const cardController = require('../controllers/card.controller');
 const authenticate = require('../middlewares/auth.middleware');
 const checkWorkspaceRole = require('../middlewares/rbac.middleware');
 
@@ -9,6 +10,7 @@ router.get('/', workspaceController.getMine);
 router.post('/', workspaceController.create);
 router.patch('/:id', checkWorkspaceRole(['OWNER', 'ADMIN']), workspaceController.update);
 router.get('/:id/members', checkWorkspaceRole(['OWNER', 'ADMIN', 'MEMBER']), workspaceController.getMembers);
+router.get('/:id/search', checkWorkspaceRole(['OWNER', 'ADMIN', 'MEMBER']), cardController.search);
 router.post('/:id/invite', checkWorkspaceRole(['OWNER', 'ADMIN']), workspaceController.invite);
 router.delete('/:id', checkWorkspaceRole(['OWNER']), workspaceController.remove);
 

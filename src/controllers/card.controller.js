@@ -94,4 +94,21 @@ const remove = async (req, res, next) => {
   }
 };
 
-module.exports = { create, update, remove };
+const search = async (req, res, next) => {
+  try {
+    const { q, assigneeId, label, dueBefore, dueAfter } = req.query;
+    const results = await cardService.searchCards({
+      workspaceId: req.params.id,
+      query: q,
+      assigneeId,
+      label,
+      dueBefore,
+      dueAfter,
+    });
+    return res.status(200).json(results);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { create, update, remove, search };

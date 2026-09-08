@@ -65,4 +65,42 @@ const deleteCard = async (cardId) => {
   return card;
 };
 
-module.exports = { createCard, updateCard, deleteCard };
+const searchCards = async ({ workspaceId, query, assigneeId, label, dueBefore, dueAfter }) => {
+  const cards = await prisma.card.findMany({
+    where: {
+      list: { board: { workspaceId } },
+      ...(query && {
+        OR: [{ title: { contains: query } }, { description: { contains: query } }],
+      }),
+      ...(assigneeId && { assignees: { some: { userId: assigneeId } } }),
+      ...(dueBefore && { dueDate: { lte: new Date(dueBefore) } }),
+      ...(dueAfter && { dueDate: { gte: new Date(dueAfter) } }),
+    },
+    include: {
+      assignees: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
+      list: { select: { id: true, title: true, board: { select: { id: true, title: true } } } },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  const results = cards.map((card) => ({
+    id: card.id,
+    title: card.title,
+    description: card.description,
+    dueDate: card.dueDate,
+    labels: card.labels,
+    assignees: card.assignees.map((a) => a.user),
+    listId: card.list.id,
+    listName: card.list.title,
+    boardId: card.list.board.id,
+    boardName: card.list.board.title,
+  }));
+
+  if (!label) return results;
+
+  // labels is an unstructured Json field, so filter in application code rather
+  // than relying on MySQL's limited/inconsistent JSON-array query support.
+  return results.filter((card) => Array.isArray(card.labels) && card.labels.includes(label));
+};
+
+module.exports = { createCard, updateCard, deleteCard, searchCards };
