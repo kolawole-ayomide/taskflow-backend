@@ -48,6 +48,47 @@ describe('Card CRUD', () => {
     expect(res.body.title).toBe('Fix login bug');
   });
 
+    it('defaults a new card to MED priority when none is given', async () => {
+    const { token, listId } = await setupWorkspaceBoardList();
+
+    const res = await request(app)
+      .post(`/api/lists/${listId}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'No priority specified', position: 1 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.priority).toBe('MED');
+  });
+
+  it('creates a card with an explicit priority', async () => {
+    const { token, listId } = await setupWorkspaceBoardList();
+
+    const res = await request(app)
+      .post(`/api/lists/${listId}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Urgent fix', position: 1, priority: 'CRITICAL' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.priority).toBe('CRITICAL');
+  });
+
+  it('updates a card\'s priority', async () => {
+    const { token, listId } = await setupWorkspaceBoardList();
+
+    const cardRes = await request(app)
+      .post(`/api/lists/${listId}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Fix login bug', position: 1 });
+
+    const res = await request(app)
+      .patch(`/api/cards/${cardRes.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ priority: 'HIGH' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.priority).toBe('HIGH');
+  });
+
   it('updates a card title', async () => {
     const { token, listId } = await setupWorkspaceBoardList();
 

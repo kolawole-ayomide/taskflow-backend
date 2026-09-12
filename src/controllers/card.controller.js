@@ -5,12 +5,12 @@ const { getIO } = require('../sockets/socket.manager');
 
 const create = async (req, res, next) => {
   try {
-    const { title, position } = req.body;
+    const { title, position, priority } = req.body;
     if (!title || position === undefined) {
       return res.status(400).json({ message: 'Title and position are required' });
     }
 
-    const card = await cardService.createCard({ listId: req.params.id, title, position });
+    const card = await cardService.createCard({ listId: req.params.id, title, position, priority });
 
     await activityService.logActivity({
       boardId: card.list.boardId,
@@ -27,7 +27,7 @@ const create = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
-    const { listId, sourceListId, position, title, description, dueDate, assigneeIds, labels, workspaceId } = req.body;
+    const { listId, sourceListId, position, title, description, dueDate, priority, assigneeIds, labels, workspaceId } = req.body;
     const { card, newlyAddedAssigneeIds } = await cardService.updateCard({
       cardId: req.params.id,
       workspaceId,
@@ -36,6 +36,7 @@ const update = async (req, res, next) => {
       title,
       description,
       dueDate,
+      priority,
       assigneeIds,
       labels,
     });
@@ -53,7 +54,7 @@ const update = async (req, res, next) => {
             // Explicit field list rather than spreading req.body — the RBAC
             // middleware injects workspaceId into the body, which has no
             // business appearing in a broadcast payload.
-            fields: { title, description, dueDate, assigneeIds, labels },
+            fields: { title, description, dueDate, priority, assigneeIds, labels },
             updatedBy: req.user.id,
           });
     }
@@ -111,7 +112,7 @@ const remove = async (req, res, next) => {
 
 const search = async (req, res, next) => {
   try {
-    const { q, assigneeId, label, dueBefore, dueAfter } = req.query;
+    const { q, assigneeId, label, dueBefore, dueAfter, limit, offset } = req.query;
     const results = await cardService.searchCards({
       workspaceId: req.params.id,
       query: q,
@@ -119,6 +120,9 @@ const search = async (req, res, next) => {
       label,
       dueBefore,
       dueAfter,
+      // Cap limit at 100 so a client can't request an unbounded page size.
+      limit: limit ? Math.min(parseInt(limit, 10), 100) : 25,
+      offset: offset ? parseInt(offset, 10) : 0,
     });
     return res.status(200).json(results);
   } catch (error) {

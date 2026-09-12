@@ -179,6 +179,105 @@ describe('Board CRUD', () => {
     expect(res.status).toBe(400);
   });
 
+    it('creates a board with description and color', async () => {
+    const { token, workspaceId } = await signupAndCreateWorkspace();
+
+    const res = await request(app)
+      .post('/api/boards')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Marketing', workspaceId, description: 'Q4 campaigns', color: '#FF5733' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.description).toBe('Q4 campaigns');
+    expect(res.body.color).toBe('#FF5733');
+  });
+
+  it('updates only color without touching title or description', async () => {
+    const { token, workspaceId } = await signupAndCreateWorkspace();
+
+    const createRes = await request(app)
+      .post('/api/boards')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Original Title', workspaceId, description: 'Original description' });
+
+    const res = await request(app)
+      .patch(`/api/boards/${createRes.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ color: '#00FF00' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.color).toBe('#00FF00');
+    expect(res.body.title).toBe('Original Title');
+    expect(res.body.description).toBe('Original description');
+  });
+
+  it('lists all boards in a workspace with card counts', async () => {
+    const { token, workspaceId } = await signupAndCreateWorkspace();
+
+    const boardRes = await request(app)
+      .post('/api/boards')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Board With Cards', workspaceId });
+
+    const listRes = await request(app)
+      .post(`/api/boards/${boardRes.body.id}/lists`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'To Do', position: 1 });
+
+    await request(app)
+      .post(`/api/lists/${listRes.body.id}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Card One', position: 1 });
+
+    await request(app)
+      .post(`/api/lists/${listRes.body.id}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Card Two', position: 2 });
+
+    await request(app)
+      .post('/api/boards')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Empty Board', workspaceId });
+
+    const res = await request(app)
+      .get(`/api/workspaces/${workspaceId}/boards`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+
+    const withCards = res.body.find((b) => b.title === 'Board With Cards');
+    const empty = res.body.find((b) => b.title === 'Empty Board');
+    expect(withCards.cardCount).toBe(2);
+    expect(empty.cardCount).toBe(0);
+  });
+
+  it('returns an empty array for a workspace with no boards', async () => {
+    const { token, workspaceId } = await signupAndCreateWorkspace();
+
+    const res = await request(app)
+      .get(`/api/workspaces/${workspaceId}/boards`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(0);
+  });
+
+  it('rejects a non-member from listing a workspace\'s boards', async () => {
+    const { workspaceId } = await signupAndCreateWorkspace();
+    const outsiderSignup = await request(app).post('/api/auth/signup').send({
+      name: 'Outsider',
+      email: 'outsider-boards@test.com',
+      password: 'password123',
+    });
+
+    const res = await request(app)
+      .get(`/api/workspaces/${workspaceId}/boards`)
+      .set('Authorization', `Bearer ${outsiderSignup.body.token}`);
+
+    expect(res.status).toBe(403);
+  });
+
   it('deletes a board', async () => {
     const { token, boardId } = await setupBoard();
 

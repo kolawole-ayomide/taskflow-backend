@@ -56,9 +56,18 @@ model WorkspaceMember {
   @@unique([userId, workspaceId])
 }
 
+enum Priority {
+  LOW
+  MED
+  HIGH
+  CRITICAL
+}
+
 model Board {
   id          String        @id @default(uuid())
   title       String
+  description String?       @db.Text
+  color       String?
   workspaceId String
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   lists       List[]
@@ -84,6 +93,7 @@ model Card {
   description String?       @db.Text
   position    Float
   dueDate     DateTime?
+  priority    Priority      @default(MED)
   labels      Json?
   listId      String
   list        List          @relation(fields: [listId], references: [id], onDelete: Cascade)

@@ -54,8 +54,10 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Fix login bug');
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].title).toBe('Fix login bug');
+    expect(res.body.total).toBe(1);
+    expect(res.body.hasMore).toBe(false);
   });
 
   it('finds a card by matching description text', async () => {
@@ -76,7 +78,7 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
+    expect(res.body.items).toHaveLength(1);
   });
 
   it('finds cards across multiple boards in the same workspace', async () => {
@@ -107,8 +109,8 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(2);
-    const boardNames = res.body.map((c) => c.boardName).sort();
+    expect(res.body.items).toHaveLength(2);
+    const boardNames = res.body.items.map((c) => c.boardName).sort();
     expect(boardNames).toEqual(['Second Board', 'Test Board']);
   });
 
@@ -141,8 +143,8 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Assigned card');
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].title).toBe('Assigned card');
   });
 
   it('filters by label', async () => {
@@ -168,8 +170,8 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Urgent card');
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].title).toBe('Urgent card');
   });
 
   it('filters by due date range', async () => {
@@ -201,8 +203,8 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Due soon');
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].title).toBe('Due soon');
   });
 
   it('combines text search with an assignee filter', async () => {
@@ -234,11 +236,11 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Fix payment bug');
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].title).toBe('Fix payment bug');
   });
 
-  it('returns an empty array when nothing matches', async () => {
+  it('returns an empty result when nothing matches', async () => {
     const { owner, workspaceId, listId } = await setupWorkspaceWithBoard();
 
     await request(app)
@@ -251,7 +253,9 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${owner.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(0);
+    expect(res.body.items).toHaveLength(0);
+    expect(res.body.total).toBe(0);
+    expect(res.body.hasMore).toBe(false);
   });
 
   it('rejects a non-member from searching a workspace', async () => {
@@ -263,5 +267,100 @@ describe('Search & Filter', () => {
       .set('Authorization', `Bearer ${outsider.token}`);
 
     expect(res.status).toBe(403);
+  });
+
+  it('returns each card with its priority', async () => {
+    const { owner, workspaceId, listId } = await setupWorkspaceWithBoard();
+
+    const cardRes = await request(app)
+      .post(`/api/lists/${listId}/cards`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ title: 'Critical bug', position: 1, priority: 'CRITICAL' });
+
+    const res = await request(app)
+      .get(`/api/workspaces/${workspaceId}/search?q=critical`)
+      .set('Authorization', `Bearer ${owner.token}`);
+
+    expect(res.body.items[0].priority).toBe('CRITICAL');
+  });
+
+  describe('Pagination', () => {
+    const createNCards = async (owner, listId, n) => {
+      for (let i = 1; i <= n; i += 1) {
+        await request(app)
+          .post(`/api/lists/${listId}/cards`)
+          .set('Authorization', `Bearer ${owner.token}`)
+          .send({ title: `Card ${i}`, position: i });
+      }
+    };
+
+    it('defaults to a page size of 25 with an accurate total and hasMore', async () => {
+      const { owner, workspaceId, listId } = await setupWorkspaceWithBoard();
+      await createNCards(owner, listId, 30);
+
+      const res = await request(app)
+        .get(`/api/workspaces/${workspaceId}/search`)
+        .set('Authorization', `Bearer ${owner.token}`);
+
+      expect(res.body.items).toHaveLength(25);
+      expect(res.body.total).toBe(30);
+      expect(res.body.hasMore).toBe(true);
+    });
+
+    it('respects a custom limit and offset', async () => {
+      const { owner, workspaceId, listId } = await setupWorkspaceWithBoard();
+      await createNCards(owner, listId, 10);
+
+      const res = await request(app)
+        .get(`/api/workspaces/${workspaceId}/search?limit=4&offset=8`)
+        .set('Authorization', `Bearer ${owner.token}`);
+
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(10);
+      expect(res.body.hasMore).toBe(false);
+    });
+
+    it('caps limit at 100 even if a larger value is requested', async () => {
+      const { owner, workspaceId, listId } = await setupWorkspaceWithBoard();
+      await createNCards(owner, listId, 5);
+
+      const res = await request(app)
+        .get(`/api/workspaces/${workspaceId}/search?limit=500`)
+        .set('Authorization', `Bearer ${owner.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(5);
+    });
+
+    it('paginates correctly even when combined with a label filter', async () => {
+      const { owner, workspaceId, listId } = await setupWorkspaceWithBoard();
+
+      for (let i = 1; i <= 5; i += 1) {
+        const cardRes = await request(app)
+          .post(`/api/lists/${listId}/cards`)
+          .set('Authorization', `Bearer ${owner.token}`)
+          .send({ title: `Urgent ${i}`, position: i });
+
+        await request(app)
+          .patch(`/api/cards/${cardRes.body.id}`)
+          .set('Authorization', `Bearer ${owner.token}`)
+          .send({ labels: ['urgent'] });
+      }
+
+      // One extra card without the label, to prove it's correctly excluded
+      // from both the page and the total even with pagination active.
+      await request(app)
+        .post(`/api/lists/${listId}/cards`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ title: 'Not urgent', position: 6 });
+
+      const res = await request(app)
+        .get(`/api/workspaces/${workspaceId}/search?label=urgent&limit=2&offset=0`)
+        .set('Authorization', `Bearer ${owner.token}`);
+
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(5);
+      expect(res.body.hasMore).toBe(true);
+    });
   });
 });
