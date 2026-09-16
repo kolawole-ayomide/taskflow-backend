@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 const authRoutes = require('./routes/auth.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
 const boardRoutes = require('./routes/board.routes');
@@ -32,6 +34,11 @@ app.use('/api/cards', cardRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/user', userRoutes);
+
+// Live, interactive API docs — visit /api-docs in a browser. Click "Authorize"
+// and paste a Bearer token (from Signup or Login) to try real requests against
+// this running server directly from the browser.
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK' });
