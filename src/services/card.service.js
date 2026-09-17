@@ -52,7 +52,7 @@ const updateCard = async ({ cardId, workspaceId, listId, position, title, descri
       ...(position !== undefined && { position }),
       ...(title !== undefined && { title }),
       ...(description !== undefined && { description }),
-      ...(dueDate !== undefined && { dueDate }),
+      ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate).toISOString() : null }),
       ...(priority !== undefined && { priority }),
       ...(labels !== undefined && { labels }),
       ...(assigneeIds !== undefined && {
