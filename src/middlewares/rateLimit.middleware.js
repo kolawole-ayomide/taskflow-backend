@@ -4,8 +4,8 @@ const rateLimit = require('express-rate-limit');
 // Skipped entirely in tests — the test suite signs up dozens of users rapidly
 // across different files, which would otherwise trip this immediately.
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: 1 * 60 * 1000,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many attempts. Please try again in a few minutes.' },
